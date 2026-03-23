@@ -19,10 +19,10 @@ describe('Mock API Client', () => {
 
   it('should route to mock handler when mocks are enabled', async () => {
     const fetchPromise = fetchClient('http://localhost:4000/health');
-    
+
     // Fast-forward time to skip the 500ms delay
     jest.advanceTimersByTime(500);
-    
+
     const response = await fetchPromise;
     const data = await response.json();
 
@@ -34,23 +34,23 @@ describe('Mock API Client', () => {
 
   it('should return mock aid packages', async () => {
     const fetchPromise = fetchClient('http://localhost:4000/aid-packages');
-    
+
     jest.advanceTimersByTime(500);
-    
+
     const response = await fetchPromise;
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(Array.isArray(data)).toBe(true);
-    expect(data).toHaveLength(2);
+    expect(data).toHaveLength(8);
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('should handle query parameters correctly', async () => {
     const fetchPromise = fetchClient('http://localhost:4000/aid-packages?status=pending&sort=desc');
-    
+
     jest.advanceTimersByTime(500);
-    
+
     const response = await fetchPromise;
     const data = await response.json();
 
@@ -61,9 +61,9 @@ describe('Mock API Client', () => {
 
   it('should handle relative URLs', async () => {
     const fetchPromise = fetchClient('/health');
-    
+
     jest.advanceTimersByTime(500);
-    
+
     const response = await fetchPromise;
     const data = await response.json();
 

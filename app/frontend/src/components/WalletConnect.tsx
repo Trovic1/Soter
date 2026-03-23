@@ -11,7 +11,7 @@ export const WalletConnect: React.FC = () => {
   const { publicKey, setPublicKey, network, setNetwork, disconnect } = useWalletStore();
   const [mounted, setMounted] = useState(false);
   const { toast } = useToast();
-  
+
   // Keep track of previous public key to avoid infinite toast loops and state updates
   const prevPublicKeyRef = useRef<string | null>(publicKey);
 
@@ -37,19 +37,19 @@ export const WalletConnect: React.FC = () => {
 
       if (isActuallyConnected) {
         const pubKeyRaw = await getAddress();
-        const addressStr = pubKeyRaw && typeof pubKeyRaw === 'object' && 'address' in pubKeyRaw 
-          ? pubKeyRaw.address 
+        const addressStr = pubKeyRaw && typeof pubKeyRaw === 'object' && 'address' in pubKeyRaw
+          ? pubKeyRaw.address
           : pubKeyRaw;
 
         if (addressStr && typeof addressStr === 'string') {
           if (prevPublicKeyRef.current !== addressStr) {
-             setPublicKey(addressStr);
-             prevPublicKeyRef.current = addressStr;
-             
-             // Only toast if it's changing from another account, or if it wasn't connected locally but Freighter was already connected
-             if (prevPublicKeyRef.current !== null) {
-                toast("Account Changed", `Switched to ${addressStr.substring(0,4)}...${addressStr.substring(addressStr.length - 4)}`, "info");
-             }
+            setPublicKey(addressStr);
+            prevPublicKeyRef.current = addressStr;
+
+            // Only toast if it's changing from another account, or if it wasn't connected locally but Freighter was already connected
+            if (prevPublicKeyRef.current !== null) {
+              toast("Account Changed", `Switched to ${addressStr.substring(0, 4)}...${addressStr.substring(addressStr.length - 4)}`, "info");
+            }
           }
           await fetchNetwork();
         } else {
@@ -71,11 +71,11 @@ export const WalletConnect: React.FC = () => {
 
   useEffect(() => {
     setMounted(true);
-    if (typeof window === "undefined" || !(window as unknown as Record<string, unknown>).FreighterApi) {
+    if (typeof window === "undefined" || !('FreighterApi' in window)) {
       console.warn("Freighter is not installed or available in the browser.");
     } else {
       checkConnection();
-      
+
       // Polling for account or network changes since Freighter API v6 doesn't export event listeners
       const interval = setInterval(() => {
         checkConnection();
@@ -91,7 +91,7 @@ export const WalletConnect: React.FC = () => {
       await setAllowed();
       const pubKey = await getAddress();
       const addressStr = typeof pubKey === 'object' ? pubKey.address : pubKey;
-      
+
       if (addressStr) {
         setPublicKey(addressStr);
         prevPublicKeyRef.current = addressStr;
@@ -104,10 +104,10 @@ export const WalletConnect: React.FC = () => {
       console.error("Error connecting to Freighter:", err);
       let errMsg = "Something went wrong. Please try connecting again.";
       if (err === "User declined" || (err && typeof err === "object" && "message" in err && String((err as Record<string, unknown>).message).includes("User declined"))) {
-         errMsg = "Connection cancelled by user.";
-         toast("Connection Rejected", errMsg, "error");
+        errMsg = "Connection cancelled by user.";
+        toast("Connection Rejected", errMsg, "error");
       } else {
-         toast("Connection Error", errMsg, "error");
+        toast("Connection Error", errMsg, "error");
       }
       setError(errMsg);
       setPublicKey(null);
@@ -138,11 +138,10 @@ export const WalletConnect: React.FC = () => {
       <div className="flex flex-col items-end space-y-1">
         <div className="flex items-center space-x-2">
           {network && (
-            <span className={`text-xs px-2 py-1 rounded-md border font-medium ${
-              network.toUpperCase().includes("MAINNET") || network.toUpperCase().includes("PUBLIC")
-                ? "bg-green-900/30 text-green-400 border-green-800" 
-                : "bg-yellow-900/30 text-yellow-500 border-yellow-700"
-            }`}>
+            <span className={`text-xs px-2 py-1 rounded-md border font-medium ${network.toUpperCase().includes("MAINNET") || network.toUpperCase().includes("PUBLIC")
+              ? "bg-green-900/30 text-green-400 border-green-800"
+              : "bg-yellow-900/30 text-yellow-500 border-yellow-700"
+              }`}>
               {network.toUpperCase()}
             </span>
           )}
