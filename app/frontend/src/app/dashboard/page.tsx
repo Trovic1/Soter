@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { DashboardContent } from '@/components/dashboard/DashboardContent';
+import { MapSection } from '@/components/dashboard/MapSection';
 
 function StatCard({ title, description }: { title: string; description: string }) {
   return (
@@ -25,6 +26,7 @@ function PackageListSkeleton() {
   );
 }
 
+
 export default function AidDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-gray-50 dark:to-gray-950">
@@ -48,6 +50,9 @@ export default function AidDashboard() {
             <StatCard title="Total Distributed" description="Pulled from Soroban contracts" />
             <StatCard title="Recipients Reached" description="Verified on-chain claims" />
           </div>
+
+          {/* Live Map */}
+          <MapSection />
 
           {/* Search / Filter + Package list — client, needs Suspense for useSearchParams */}
           <Suspense fallback={<PackageListSkeleton />}>
