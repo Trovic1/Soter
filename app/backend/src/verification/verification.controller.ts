@@ -4,6 +4,7 @@ import {
   Body,
   Get,
   Param,
+  Query,
   Version,
   HttpStatus,
   HttpCode,
@@ -29,6 +30,7 @@ import { API_VERSIONS } from '../common/constants/api-version.constants';
 import { StartVerificationDto } from './dto/start-verification.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { CompleteVerificationDto } from './dto/complete-verification.dto';
+import { ApiQuery } from '@nestjs/swagger';
 
 @ApiTags('Verification')
 @ApiSecurity('x-api-key')
@@ -210,6 +212,22 @@ export class VerificationController {
     return this.verificationFlowService.complete(dto);
   }
 
+  @Get()
+  @Version(API_VERSIONS.V1)
+  @ApiBearerAuth('JWT-auth')
+  @ApiQuery({ name: 'status', required: false, description: 'Optional UI status filter (pending_review, approved, rejected, needs_resubmission)' })
+  @ApiOperation({
+    summary: 'List verification inbox items',
+    description:
+      'Retrieve verification cases for operators — supports optional UI-friendly status filter',
+  })
+  @ApiOkResponse({
+    description: 'List of verification cases',
+  })
+  findAll(@Query('status') status?: string) {
+    return this.verificationService.findAll(status);
+  }
+
   @Post()
   @Version(API_VERSIONS.V1)
   @ApiOperation({
@@ -378,5 +396,38 @@ export class VerificationController {
   })
   update(@Param('id') id: string, @Body() data: Record<string, unknown>) {
     return this.verificationService.update(id, data);
+  }
+
+  @Post(':id/approve')
+  @Version('1')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Approve verification (operator)',
+    description: 'Operator approves a verification request, marking it verified.',
+  })
+  async approve(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.verificationService.updateStatus(id, 'approve', body as any);
+  }
+
+  @Post(':id/reject')
+  @Version('1')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Reject verification (operator)',
+    description: 'Operator rejects a verification request, archiving the claim.',
+  })
+  async reject(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.verificationService.updateStatus(id, 'reject', body as any);
+  }
+
+  @Post(':id/request-resubmission')
+  @Version('1')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Request resubmission (operator)',
+    description: 'Operator requests additional evidence and sets claim back to requested.',
+  })
+  async requestResubmission(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.verificationService.updateStatus(id, 'request_resubmission', body as any);
   }
 }

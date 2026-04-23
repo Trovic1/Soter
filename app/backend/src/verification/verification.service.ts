@@ -600,8 +600,88 @@ the JSON verdict.
     return 'This action adds a new verification';
   }
 
-  async findAll() {
-    return Promise.resolve([]);
+  async findAll(uiStatus?: string) {
+    // Map UI-friendly statuses to DB ClaimStatus values
+    const statusMap: Record<string, string[]> = {
+      pending_review: ['requested'],
+      approved: ['approved', 'verified'],
+      rejected: ['archived'],
+      needs_resubmission: ['requested'],
+    };
+
+    let where: Record<string, unknown> | undefined = undefined;
+
+    if (uiStatus) {
+      const mapped = statusMap[uiStatus] ?? [uiStatus];
+      where = { status: { in: mapped } } as unknown as Record<string, unknown>;
+    } else {
+      // Default to show items that are in review or recently verified/approved
+      where = { status: { in: ['requested', 'verified', 'approved'] } } as unknown as Record<string, unknown>;
+    }
+
+    const claims = await this.prisma.claim.findMany({
+      where,
+      select: {
+        id: true,
+        campaignId: true,
+        amount: true,
+        recipientRef: true,
+        evidenceRef: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
+    });
+
+    // Enrich with UI-friendly status and next-step messaging using audit logs
+    const enriched = await Promise.all(
+      claims.map(async (c) => {
+        const lastAudit = await this.prisma.auditLog.findFirst({
+          where: { entity: 'verification', entityId: c.id },
+          orderBy: { timestamp: 'desc' },
+        });
+
+        let uiStatus = 'pending_review';
+        if (lastAudit && lastAudit.action === 'request_resubmission') {
+          uiStatus = 'needs_resubmission';
+        } else if (c.status === 'verified' || c.status === 'approved') {
+          uiStatus = 'approved';
+        } else if (c.status === 'archived') {
+          uiStatus = 'rejected';
+        } else if (c.status === 'requested') {
+          uiStatus = 'pending_review';
+        } else {
+          uiStatus = c.status;
+        }
+
+        const nextStep =
+          uiStatus === 'pending_review'
+            ? 'Review evidence — approve, reject, or request resubmission.'
+            : uiStatus === 'needs_resubmission'
+            ? 'Awaiting applicant resubmission of evidence.'
+            : uiStatus === 'approved'
+            ? 'No action required — claim approved.'
+            : uiStatus === 'rejected'
+            ? 'Claim rejected. Optionally reopen.'
+            : 'View details.';
+
+        return {
+          ...c,
+          uiStatus,
+          nextStep,
+          deepLink: `/verification/${c.id}`,
+        };
+      }),
+    );
+
+    // If a UI filter was provided, filter enriched results accordingly
+    if (uiStatus) {
+      return enriched.filter((e) => e.uiStatus === uiStatus);
+    }
+
+    return enriched;
   }
 
   async findOne(id: string) {
@@ -624,7 +704,46 @@ the JSON verdict.
       action: 'update',
       metadata: updateVerificationDto,
     });
+    // Allow callers to change claim status via update payload
+    if (typeof updateVerificationDto.status === 'string') {
+      const newStatus = updateVerificationDto.status as string;
+      await this.prisma.claim.update({ where: { id }, data: { status: newStatus as any } });
+    }
+
     return { id, message: 'Verification updated' };
+  }
+
+  /** Update claim status based on operator action */
+  async updateStatus(id: string, action: 'approve' | 'reject' | 'request_resubmission', metadata: Record<string, unknown> = {}) {
+    const claim = await this.prisma.claim.findUnique({ where: { id } });
+    if (!claim) throw new NotFoundException(`Claim with ID ${id} not found`);
+
+    let newStatus: string;
+    switch (action) {
+      case 'approve':
+        newStatus = 'verified';
+        break;
+      case 'reject':
+        newStatus = 'archived';
+        break;
+      case 'request_resubmission':
+        newStatus = 'requested';
+        break;
+      default:
+        newStatus = claim.status;
+    }
+
+    await this.prisma.claim.update({ where: { id }, data: { status: newStatus as any } });
+
+    await this.auditService.record({
+      actorId: metadata.actorId ? String(metadata.actorId) : 'operator',
+      entity: 'verification',
+      entityId: id,
+      action,
+      metadata,
+    });
+
+    return { id, status: newStatus };
   }
 
   async remove(id: string) {
